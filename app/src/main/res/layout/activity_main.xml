@@ -255,38 +255,6 @@
                         android:text="暂无第三方插件。"
                         android:textAppearance="@style/TextAppearance.Material3.BodySmall" />
 
-                    <TextView
-                        android:id="@+id/tvInstalledHint"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="有插件让 dsh-Go 打不开时：点那个插件的「彻底清理」，或直接用下面的急救按钮。"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnDisableAll"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="急救：停用全部" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnRestoreDisabled"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:layout_weight="1"
-                            android:text="恢复启用" />
-                    </LinearLayout>
-
                     <LinearLayout
                         android:id="@+id/listInstalled"
                         android:layout_width="match_parent"

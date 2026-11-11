@@ -52,8 +52,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var progressInstall: LinearProgressIndicator
     private lateinit var tvInstallLog: TextView
     private lateinit var tvInstalledEmpty: TextView
-    private lateinit var btnDisableAll: MaterialButton
-    private lateinit var btnRestoreDisabled: MaterialButton
     private lateinit var listInstalled: LinearLayout
     private lateinit var tvUnlock: TextView
     private lateinit var btnUnlock: MaterialButton
@@ -137,8 +135,6 @@ class MainActivity : AppCompatActivity() {
         progressInstall = findViewById(R.id.progressInstall)
         tvInstallLog = findViewById(R.id.tvInstallLog)
         tvInstalledEmpty = findViewById(R.id.tvInstalledEmpty)
-        btnDisableAll = findViewById(R.id.btnDisableAll)
-        btnRestoreDisabled = findViewById(R.id.btnRestoreDisabled)
         listInstalled = findViewById(R.id.listInstalled)
         tvUnlock = findViewById(R.id.tvUnlock)
         btnUnlock = findViewById(R.id.btnUnlock)
@@ -201,8 +197,6 @@ class MainActivity : AppCompatActivity() {
             ) { doRepair() }
         }
         btnForceClean.setOnClickListener { showForceCleanDialog() }
-        btnDisableAll.setOnClickListener { doDisableAll() }
-        btnRestoreDisabled.setOnClickListener { doRestoreDisabled() }
         btnRestoreSafe.setOnClickListener {
             confirm(
                 "恢复被安全模式挪走的文件？",
@@ -415,234 +409,78 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderInstalled(e: DshEnv) {
         listInstalled.removeAllViews()
-        val items = try {
-            PluginManager.scan(e, installedVersions)
-        } catch (t: Throwable) {
-            appendLogLine("体检扫描失败：" + (t.message ?: t.toString()))
-            emptyList<InstalledPlugin>()
+        var count = 0
+        for (p in e.profiles) {
+            val third = p.dependencies.filter { !isInternal(it.first) }
+            if (third.isEmpty()) continue
+            if (e.profiles.size > 1) listInstalled.addView(sectionLabel("配置 ${p.name}"))
+            for ((name, spec) in third) {
+                count++
+                listInstalled.addView(pluginRow(e, p, name, spec))
+            }
         }
-        for (item in items) listInstalled.addView(pluginRow(e, item))
-        tvInstalledEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
-        if (items.isEmpty()) tvInstalledEmpty.text = "暂无第三方插件。"
-        else tvInstalledEmpty.text = "共 ${items.size} 个插件，其中有问题的 ${items.count { it.problems > 0 }} 个。"
-        if (items.any { it.problems > 0 }) {
-            appendLogLine("⚠ 有插件存在会让 dsh-Go 起不来的问题，点那个插件的「详情」看原因，或直接「彻底清理」。")
-        }
+        tvInstalledEmpty.visibility = if (count == 0) View.VISIBLE else View.GONE
     }
 
-    private fun pluginRow(e: DshEnv, item: InstalledPlugin): View {
+    private fun pluginRow(e: DshEnv, p: ProfileState, name: String, spec: String): View {
+        val version = installedVersions[p.name]?.get(name)?.takeIf { it.isNotBlank() } ?: spec
+        val kind = when {
+            e.dshGoPlugins.contains(name) -> "dsh-go 原生"
+            spec.startsWith("link:") -> "本地链接"
+            spec.contains("://") || spec.startsWith("git") -> "远程包"
+            else -> "npm 包"
+        }
+        val enabled = p.isEnabled(name)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(10), 0, dp(10))
+            setPadding(0, dp(8), 0, dp(8))
         }
         val line1 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         line1.addView(TextView(this).apply {
-            text = item.name
+            text = name
             textSize = 14f
             setTypeface(typeface, Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         })
         line1.addView(TextView(this).apply {
-            text = item.version
+            text = version
             textSize = 12f
             setTextColor(themeColor(android.R.attr.textColorSecondary))
         })
         container.addView(line1)
 
-        val warnColor = 0xFFD32F2F.toInt()
-        container.addView(TextView(this).apply {
-            text = item.kind + " · " + item.stateText +
-                (if (item.sizeText.isNotEmpty()) " · 占 " + item.sizeText else "")
-            textSize = 11f
-            setTextColor(if (item.problems > 0) warnColor else themeColor(android.R.attr.textColorSecondary))
-        })
-        for (n in item.notes.filter { it.bad }.take(3)) {
-            container.addView(TextView(this).apply {
-                text = "⚠ " + n.text
-                textSize = 11f
-                setTextColor(warnColor)
-            })
-        }
-
-        val btns = LinearLayout(this).apply {
+        val line2 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
+            gravity = Gravity.CENTER_VERTICAL
         }
-        val addBtn: (String, () -> Unit) -> Unit = { label, onTap ->
-            val b = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle)
-            b.text = label
-            b.textSize = 12f
-            b.minWidth = 0
-            b.setPadding(dp(10), 0, dp(10), 0)
-            b.layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { marginStart = dp(6) }
-            b.setOnClickListener { onTap() }
-            btns.addView(b)
+        line2.addView(TextView(this).apply {
+            text = "类型：$kind · 状态：" + if (enabled) "已启用" else "已停用"
+            textSize = 11f
+            setTextColor(themeColor(android.R.attr.textColorSecondary))
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        val sw = MaterialSwitch(this).apply {
+            text = "启用"
+            textSize = 12f
+            isChecked = enabled
         }
-        addBtn("详情") { showPluginDetail(e, item) }
-        addBtn("彻底清理") { confirmPurge(item.name) }
-        addBtn("卸载") {
-            val profile = item.enabledIn.firstOrNull() ?: item.specs.keys.firstOrNull() ?: "desktop"
-            confirmUninstall(e, profile, item.name)
+        sw.setOnCheckedChangeListener { _, checked ->
+            if (!spinnerSyncing) toggleBundle(p.name, name, checked)
         }
-        container.addView(btns)
+        line2.addView(sw)
+        val del = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            text = "卸载"
+            textSize = 12f
+            minWidth = 0
+            setPadding(dp(8), 0, dp(8), 0)
+        }
+        del.setOnClickListener { confirmUninstall(e, p.name, name) }
+        line2.addView(del)
+        container.addView(line2)
         return container
-    }
-
-    private fun showPluginDetail(e: DshEnv, item: InstalledPlugin) {
-        val sb = StringBuilder()
-        sb.append("类型：").append(item.kind).append('\n')
-        sb.append("版本：").append(item.version).append('\n')
-        sb.append("所在配置：").append(if (item.specs.isEmpty()) "—" else item.specs.keys.joinToString("、")).append('\n')
-        for ((p, s) in item.specs) sb.append("依赖写法（").append(p).append("）：").append(s).append('\n')
-        if (item.sizeText.isNotEmpty()) sb.append("本地副本：").append(item.sizeText).append('\n')
-        if (item.notes.isEmpty()) {
-            sb.append("\n体检：没有发现问题。")
-        } else {
-            sb.append("\n体检结果：\n")
-            for (n in item.notes) {
-                sb.append(if (n.bad) "⚠ " else "· ").append(n.text).append('\n')
-            }
-        }
-        AlertDialog.Builder(this)
-            .setTitle(item.name)
-            .setMessage(sb.toString().trim())
-            .setNegativeButton("关闭", null)
-            .setNeutralButton(if (item.enabled) "全部停用" else "全部启用") { _, _ ->
-                toggleAll(item, !item.enabled)
-            }
-            .setPositiveButton("彻底清理") { _, _ -> confirmPurge(item.name) }
-            .show()
-    }
-
-    private fun toggleAll(item: InstalledPlugin, enabled: Boolean) {
-        val e = env ?: run { toast("环境未就绪"); return }
-        setBusy(true, if (enabled) "正在启用…" else "正在停用…")
-        io.execute {
-            val sb = StringBuilder()
-            for (p in item.specs.keys) {
-                val r = try {
-                    Installer.setBundleEnabled(e, p, item.name, enabled, cacheDir)
-                } catch (t: Throwable) {
-                    null
-                }
-                sb.append(if (r != null && r.ok) "✓ " else "✗ ").append(p).append("：")
-                    .append(if (r != null) r.message else "执行出错").append('\n')
-            }
-            ui.post {
-                setBusy(false)
-                appendLogLine(sb.toString().trim())
-                toast(if (enabled) "已启用" else "已停用")
-                refreshAll()
-            }
-        }
-    }
-
-    private fun confirmPurge(name: String) {
-        confirm(
-            "彻底清理 $name",
-            "会依次做：\n" +
-                "① 调用 DSH 官方卸载命令（失败也继续）\n" +
-                "② 从配置里移除依赖和启用项\n" +
-                "③ 删除 node_modules 里的文件（删不掉就改名隔离）\n" +
-                "④ 清掉 cordis.patch.yml 里对它的引用\n" +
-                "⑤ 清掉版本豁免记录\n" +
-                "⑥ 删除本地副本，归还属主\n\n" +
-                "最后会再扫一遍，告诉你还有没有残留。别的插件不会被动到。",
-            "开始清理"
-        ) { doPurge(name) }
-    }
-
-    private fun doPurge(name: String) {
-        val e = env ?: run { toast("环境未就绪"); return }
-        setBusy(true, "正在彻底清理 $name…")
-        io.execute {
-            val report = try {
-                PluginManager.purge(e, name, cacheDir)
-            } catch (t: Throwable) {
-                null
-            }
-            ui.post {
-                setBusy(false)
-                if (report == null) {
-                    appendLogLine("彻底清理 $name：执行出错")
-                    toast("清理出错了，详见日志")
-                } else {
-                    val text = report.text()
-                    appendLogLine("彻底清理 $name：\n$text")
-                    AlertDialog.Builder(this)
-                        .setTitle(if (report.ok) "清理完成" else "清理完成，但还有残留")
-                        .setMessage(text)
-                        .setPositiveButton("好", null)
-                        .show()
-                    toast(if (report.ok) "已彻底清理 $name" else "还有残留，详见弹窗")
-                }
-                refreshAll()
-            }
-        }
-    }
-
-    private fun doDisableAll() {
-        val e = env ?: run { toast("环境未就绪"); return }
-        confirm(
-            "急救：停用所有第三方插件",
-            "只改配置，一个文件都不删：把启用列表里的第三方插件全部去掉，并把 cordis.patch.yml 改名成 *.off-pluginmanager。\n\n" +
-                "dsh-Go 应该马上就能起来。想恢复时点「恢复启用」。",
-            "停用"
-        ) {
-            setBusy(true, "正在停用所有第三方插件…")
-            io.execute {
-                val r = try {
-                    PluginManager.disableAllThirdParty(e, cacheDir)
-                } catch (t: Throwable) {
-                    null
-                }
-                ui.post {
-                    setBusy(false)
-                    if (r == null) {
-                        appendLogLine("急救停用：执行出错")
-                        toast("停用失败，详见日志")
-                    } else {
-                        val text = r.text()
-                        appendLogLine("急救停用：\n$text")
-                        AlertDialog.Builder(this)
-                            .setTitle("已停用第三方插件")
-                            .setMessage(text + "\n\n现在请重新打开 dsh-Go。")
-                            .setPositiveButton("好", null)
-                            .show()
-                    }
-                    refreshAll()
-                }
-            }
-        }
-    }
-
-    private fun doRestoreDisabled() {
-        val e = env ?: run { toast("环境未就绪"); return }
-        setBusy(true, "正在恢复配置补丁…")
-        io.execute {
-            val r = try {
-                PluginManager.restoreDisabled(e)
-            } catch (t: Throwable) {
-                null
-            }
-            ui.post {
-                setBusy(false)
-                if (r == null) {
-                    appendLogLine("恢复启用：执行出错")
-                    toast("恢复失败，详见日志")
-                } else {
-                    val text = r.text()
-                    appendLogLine("恢复启用：\n$text")
-                    toast(if (r.removed.isNotEmpty()) "已恢复" else "没有可恢复的项")
-                }
-                refreshAll()
-            }
-        }
     }
 
     // ---------------- 选择与解析 ----------------
@@ -1053,8 +891,6 @@ class MainActivity : AppCompatActivity() {
         btnInstall.isEnabled = false
         if (!value) updateInstallButton()
         btnForceClean.isEnabled = !value
-        btnDisableAll.isEnabled = !value
-        btnRestoreDisabled.isEnabled = !value
         btnRestoreSafe.isEnabled = !value
         if (value) {
             btnUnlock.isEnabled = false

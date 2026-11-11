@@ -14,9 +14,7 @@ dsh-Go 是运行在 Android 上的 DeepSeek Harness 客户端，插件装在它�
 - **兼容性预检**：安装前调用 `evaluatePluginCompatibility()` 判断 `engines.dsh` 是否满足，可选择继续
 - **安装**：复制到 `$DSH_HOME/local-plugins/<名>-<版本>`（dsh-go 原生插件放 `dsh-go/plugins/<名>`）→ 调用官方 CLI
 - **安装后加固**：把 `node_modules` 里的软链换成真实目录、修正属主（见下）
-- **已安装列表（带体检）**：显示版本、类型、占用体积、所在 profile；自动标出「会让 dsh-Go 起不来」的问题（依赖目录不存在、`node_modules` 缺实体、软链、显示启用但文件缺失）
-- **一键彻底清理**：官方卸载命令 → 配置依赖与启用项 → `node_modules` 文件（删不掉就改名隔离）→ `cordis.patch.yml` 里对它的引用 → 版本豁免记录 → 本地副本 → 归还属主，最后再扫一遍残留并报告
-- **急救停用 / 恢复启用**：只改配置不删文件——把所有第三方插件踢出启用列表、`cordis.patch.yml` 改名成 `*.off-pluginmanager`，让 dsh-Go 立刻能起来；一键可恢复
+- **已安装列表**：显示版本，可启用/禁用 bundle、卸载
 - **版本豁免**：对不兼容插件写 `compatibility.json`
 - **解除/还原版本限制（高级）**：直接给 DSH 的兼容性判定函数打补丁，可逐字节还原
 - **启动修复**：清理失效的依赖条目、bundles 残留、`node_modules` 孤儿条目、坏软链

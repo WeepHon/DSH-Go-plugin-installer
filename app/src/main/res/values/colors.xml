@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#4C6FFF</color>
+    <color name="brand_dark">#2F49B8</color>
+    <color name="ic_bg">#122347</color>
+    <color name="code_bg">#14000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="ok_green">#1B8A5A</color>
+    <color name="warn_orange">#B26A00</color>
+</resources>

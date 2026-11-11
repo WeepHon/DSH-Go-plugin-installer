@@ -1,0 +1,13 @@
+# 统一换行符，避免 shell 脚本 / gradlew 在 Linux 上因 CRLF 报 "bad interpreter"
+* text=auto eol=lf
+*.sh   text eol=lf
+gradlew text eol=lf
+*.kts  text eol=lf
+*.yml  text eol=lf
+
+# 二进制文件不做换行转换
+*.jar      binary
+*.apk      binary
+*.keystore binary
+*.jks      binary
+*.png      binary

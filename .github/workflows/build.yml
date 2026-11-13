@@ -15,8 +15,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4
+      # 运行器镜像自带 Android SDK（ANDROID_HOME 已导出），只需保证平台与 build-tools 在位
+      - name: Ensure Android SDK platform 34
+        run: |
+          SDK="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDK" ]; then
+            yes | "$SDK" --licenses >/dev/null 2>&1 || true
+            "$SDK" "platforms;android-34" "build-tools;34.0.0" >/dev/null || true
+          fi
       # 网页界面上传的文件会丢掉可执行位（gradlew 变成 644），这里兜一下
       - name: Make gradlew executable
         run: chmod +x gradlew
